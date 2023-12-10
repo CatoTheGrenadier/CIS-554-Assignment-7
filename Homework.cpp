@@ -61,6 +61,10 @@ private:
 class myFunctorClass {
 public:
 	//Implement all needed functors.  See the main functions
+	bool operator()(const vector<int*>& v1, const vector<int*>& v2);
+	bool operator()(const ThreeD& t1, const ThreeD& t2);
+	bool operator()(const bag<int>& b1, const bag<int>& b2);
+	bool operator()(const vector<bag<int>>& c1, const vector<bag<int>>& c2);
 };
 
 template <typename T1, typename T2 = less<T1>> ostream& operator<<(ostream& str, const bag<T1, T2>& t); //forward printing
@@ -130,10 +134,18 @@ template <class T1, class T2> bag<T1, T2>::bag(const std::initializer_list<T1>& 
 	int cnt = 0;
 	this->head = nullptr;
 	this->tail = nullptr;
+	auto cur = this->head;
 	for (auto i : I) {
 		auto new_node = new node<T1>{ i };
 		if (cnt == 0) {
-			this->head = nullptr;
+			this->head = new_node;
+			cur = this->head;
+			cnt += 1;
+		}
+		else {
+			cur->next = new_node;
+			new_node->previous = cur;
+			cur = cur->next;
 		}
 		this->tail = new_node;
 	}
@@ -152,6 +164,7 @@ template <class T1, class T2> bag<T1, T2>::bag(const bag<T1, T2>& B) { //copy co
 		}
 		else {
 			new_cur->next = new_node;
+			new_node->previous = new_cur;
 		}
 		new_cur = new_node;
 		this->tail = new_node;
@@ -160,11 +173,32 @@ template <class T1, class T2> bag<T1, T2>::bag(const bag<T1, T2>& B) { //copy co
 	this->Sort(T2());
 }
 
-template <class T1, class T2>  void bag<T1, T2>::operator=(const bag<T1, T2>& B) {
-	this->head = B.head;
-	this->tail = B.tail;
-	B.head = nullptr;
-	B.tail = nullptr;
+template <class T1, class T2>  void bag<T1, T2>::operator=(const bag<T1, T2>& B) { //copy assignment
+	auto cur = this->head;
+	auto next_up = cur;
+	while (cur != nullptr) {
+		next_up = next_up->next;
+		delete cur;
+		cur = next_up;
+	}
+	this->head = nullptr;
+	this->tail = nullptr;
+
+	auto cur_1{ B.head };
+	auto new_cur = this->head;
+	while (cur_1 != nullptr) {
+		auto new_node = new node<T1>{ cur_1->value };
+		if (this->head == nullptr) {
+			this->head = new_node;
+		}
+		else {
+			new_cur->next = new_node;
+			new_node->previous = new_cur;
+		}
+		new_cur = new_node;
+		this->tail = new_node;
+		cur_1 = cur_1->next;
+	}
 	this->Sort(T2());
 	return;
 }
@@ -185,18 +219,27 @@ template <class T1, class T2>  void bag<T1, T2>::Sort(T2 func) {
 	auto p1 = this->head;
 	auto p2 = p1;
 	auto stock = p2;
-	while (p1 != nullptr) {
+	while (p1 != this->tail) {
 		p2 = p1->next;
-		while (p2 != nullptr) {
-			if (T2(p2->value, p1->value)) {
+		while (p2 != this->tail->next) {
+			if (func(p2->value, p1->value)) {
 				auto temp = p1->value;
 				p1->value = p2->value;
 				p2->value = temp;
 				p2 = p2->next;
 			}
-			else if (p1->value == p2->value) {
+			else if (!(func(p1->value, p2->value) || func(p2->value, p1->value))) {
+				if (p2 == this->tail) {
+					p2 = this->tail->previous;
+					p2->next = nullptr;
+					delete this->tail;
+					this->tail = p2;
+					break;
+				}
 				stock = p2->next;
-				p2->previous->next = p2->next;
+				if (p2->previous != nullptr) {
+					p2->previous->next = p2->next;
+				}
 				if (p2->next != nullptr) {
 					p2->next->previous = p2->previous;
 				}
@@ -207,7 +250,111 @@ template <class T1, class T2>  void bag<T1, T2>::Sort(T2 func) {
 				p2 = p2->next;
 			}
 		}
+		if (p1 == this->tail) {
+			break;
+		}
 		p1 = p1->next;
 	}
 	return;
 }
+
+template <typename T1, typename T2> ostream& operator<<(ostream& str, const bag<T1, T2>& t) {
+	str << "< ";
+	auto cur = t.head;
+	while (cur != nullptr) {
+		str << cur->value;
+		str << " ";
+		cur = cur->next;
+	}
+	str << ">";
+	return str;
+}
+
+template <typename T1, typename T2> ostream& operator<<(ostream& str, const bag<T1, T2>&& t) {
+	str << "< ";
+	auto cur = t.tail;
+	while (cur != nullptr) {
+		str << cur->value;
+		str << " ";
+		cur = cur->previous;
+	}
+	str << ">";
+	return str;
+}
+
+template <typename T1> ostream& operator<<(ostream& str, const vector < T1*> v) {
+	str << "[ ";
+	for (auto i : v) {
+		str << *i;
+		str << " ";
+	}
+	str << "]";
+	return str;
+}
+
+template <typename T1> ostream& operator<<(ostream& str, const vector < T1> v) {
+	str << "[ ";
+	for (auto i : v) {
+		str << i;
+		str << " ";
+	}
+	str << "]";
+	return str;
+}
+
+bool myFunctorClass::operator()(const vector<int*>& v1, const vector<int*>& v2) {
+	int value_1{ 0 };
+	int value_2{ 0 };
+	for (auto i : v1) {
+		value_1 += *i;
+	}
+	for (auto i : v2) {
+		value_2 += *i;
+	}
+	return value_1 < value_2;
+}
+
+bool myFunctorClass::operator()(const ThreeD& t1, const ThreeD& t2) {
+	int value_1{ t1.dep + t1.ht + t1.wid };
+	int value_2{ t2.dep + t2.ht + t2.wid };
+	return value_1 < value_2;
+}
+
+bool myFunctorClass::operator()(const bag<int>& b1, const bag<int>& b2) {
+	int value_1{ 0 };
+	int value_2{ 0 };
+	auto cur_1 = b1.head;
+	auto cur_2 = b2.head;
+	while (cur_1) {
+		value_1 += cur_1->value;
+		cur_1 = cur_1->next;
+	}
+	while (cur_2) {
+		value_2 += cur_2->value;
+		cur_2 = cur_2->next;
+	}
+	return value_1 < value_2; 
+}
+
+bool myFunctorClass::operator()(const vector<bag<int>>& c1, const vector<bag<int>>& c2) {
+	int value_1{ 0 };
+	int value_2{ 0 };
+	for (auto i : c1) {
+		auto cur_1 = i.head;
+		while (cur_1) {
+			value_1 += cur_1->value;
+			cur_1 = cur_1->next;
+		}
+	}
+	for (auto i : c2) {
+		auto cur_2 = i.head;
+		while (cur_2) {
+			value_2 += cur_2->value;
+			cur_2 = cur_2->next;
+		}
+	}
+	return value_1 < value_2;
+}
+
+
+
