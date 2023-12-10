@@ -1,3 +1,7 @@
+//Name: Yi Ling
+//SUID: 9254508221
+//NET ID: yiling
+
 //HW7  Due: Tuesday, December 12.
 /*
 implementclass class bag, as desbribed in the class description.
